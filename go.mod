@@ -12,7 +12,7 @@ require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	k8s.io/apimachinery v0.21.2
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog/v2 v2.8.0

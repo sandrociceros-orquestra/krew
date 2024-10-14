@@ -18,7 +18,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -139,7 +138,7 @@ func installPlatformSpec(manifestFile string, p index.Platform) error {
 		return errors.Errorf("no supported platform matched platform selector: %+v", p.Selector)
 	}
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "krew-test")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "krew-test")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temp dir for plugin install")
 	}
@@ -183,7 +182,7 @@ var licenseFiles = map[string]struct{}{
 func validateLicenseFileExists(krewRoot string) error {
 	dir := environment.NewPaths(krewRoot).InstallPath()
 	var files []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -242,6 +241,7 @@ func allPlatforms() []installation.OSArchPair {
 		{OS: "linux", Arch: "amd64"},
 		{OS: "linux", Arch: "arm"},
 		{OS: "linux", Arch: "arm64"},
+		{OS: "linux", Arch: "ppc64le"},
 		{OS: "darwin", Arch: "386"},
 		{OS: "darwin", Arch: "amd64"},
 		{OS: "darwin", Arch: "arm64"},

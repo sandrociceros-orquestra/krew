@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -68,24 +67,26 @@ func Test_extractZIP(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		// Zip has just one file named 'foo'
-		zipSrc := filepath.Join(testdataPath(), tt.in)
-		tmpDir := testutil.NewTempDir(t)
+		t.Run(tt.in, func(t *testing.T) {
+			// Zip has just one file named 'foo'
+			zipSrc := filepath.Join(testdataPath(), tt.in)
+			tmpDir := testutil.NewTempDir(t)
 
-		zipReader, err := os.Open(zipSrc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer zipReader.Close()
-		stat, _ := zipReader.Stat()
-		if err := extractZIP(tmpDir.Root(), zipReader, stat.Size()); err != nil {
-			t.Fatalf("extractZIP(%s) error = %v", tt.in, err)
-		}
+			zipReader, err := os.Open(zipSrc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { zipReader.Close() })
+			stat, _ := zipReader.Stat()
+			if err := extractZIP(tmpDir.Root(), zipReader, stat.Size()); err != nil {
+				t.Fatalf("extractZIP(%s) error = %v", tt.in, err)
+			}
 
-		outFiles := collectFiles(t, tmpDir.Root())
-		if !reflect.DeepEqual(outFiles, tt.files) {
-			t.Fatalf("extractZIP(%s), expected=%v, got=%v", tt.in, tt.files, outFiles)
-		}
+			outFiles := collectFiles(t, tmpDir.Root())
+			if !reflect.DeepEqual(outFiles, tt.files) {
+				t.Fatalf("extractZIP(%s), expected=%v, got=%v", tt.in, tt.files, outFiles)
+			}
+		})
 	}
 }
 
@@ -115,27 +116,29 @@ func Test_extractTARGZ(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tarSrc := filepath.Join(testdataPath(), tt.in)
-		tmpDir := testutil.NewTempDir(t)
+		t.Run(tt.in, func(t *testing.T) {
+			tarSrc := filepath.Join(testdataPath(), tt.in)
+			tmpDir := testutil.NewTempDir(t)
 
-		tf, err := os.Open(tarSrc)
-		if err != nil {
-			t.Fatalf("failed to open %q. error=%v", tt.in, err)
-		}
-		defer tf.Close()
-		st, err := tf.Stat()
-		if err != nil {
-			t.Fatal(err)
-			return
-		}
-		if err := extractTARGZ(tmpDir.Root(), tf, st.Size()); err != nil {
-			t.Fatalf("failed to extract %q. error=%v", tt.in, err)
-		}
+			tf, err := os.Open(tarSrc)
+			if err != nil {
+				t.Fatalf("failed to open %q. error=%v", tt.in, err)
+			}
+			t.Cleanup(func() { tf.Close() })
+			st, err := tf.Stat()
+			if err != nil {
+				t.Fatal(err)
+				return
+			}
+			if err := extractTARGZ(tmpDir.Root(), tf, st.Size()); err != nil {
+				t.Fatalf("failed to extract %q. error=%v", tt.in, err)
+			}
 
-		outFiles := collectFiles(t, tmpDir.Root())
-		if !reflect.DeepEqual(outFiles, tt.files) {
-			t.Fatalf("for %q, expected=%v, got=%v", tt.in, tt.files, outFiles)
-		}
+			outFiles := collectFiles(t, tmpDir.Root())
+			if !reflect.DeepEqual(outFiles, tt.files) {
+				t.Fatalf("for %q, expected=%v, got=%v", tt.in, tt.files, outFiles)
+			}
+		})
 	}
 }
 
@@ -143,7 +146,7 @@ func Test_extractTARGZ(t *testing.T) {
 // "/" and appends "/" to directories.
 func collectFiles(t *testing.T, scanPath string) []string {
 	var outFiles []string
-	if err := filepath.Walk(scanPath, func(fp string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(scanPath, func(fp string, info os.FileInfo, _ error) error {
 		if fp == scanPath {
 			return nil
 		}
@@ -209,7 +212,7 @@ func TestDownloader_Get(t *testing.T) {
 
 func Test_download(t *testing.T) {
 	filePath := filepath.Join(testdataPath(), "test-with-directory-entry.zip")
-	downloadOriginal, err := ioutil.ReadFile(filePath)
+	downloadOriginal, err := os.ReadFile(filePath)
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -259,12 +262,12 @@ func Test_download(t *testing.T) {
 			if tt.wantErr {
 				return
 			}
-			downloadedData, err := ioutil.ReadAll(io.NewSectionReader(reader, 0, size))
+			downloadedData, err := io.ReadAll(io.NewSectionReader(reader, 0, size))
 			if err != nil {
 				t.Errorf("failed to read download data: %v", err)
 				return
 			}
-			wantData, err := ioutil.ReadAll(io.NewSectionReader(tt.wantReader, 0, tt.wantSize))
+			wantData, err := io.ReadAll(io.NewSectionReader(tt.wantReader, 0, tt.wantSize))
 			if err != nil {
 				t.Errorf("failed to read download data: %v", err)
 				return
@@ -285,14 +288,14 @@ var _ Verifier = trueVerifier{}
 type trueVerifier struct{ io.Writer }
 
 // newTrueVerifier returns a Verifier that always verifies to true.
-func newTrueVerifier() Verifier    { return trueVerifier{ioutil.Discard} }
+func newTrueVerifier() Verifier    { return trueVerifier{io.Discard} }
 func (trueVerifier) Verify() error { return nil }
 
 var _ Verifier = falseVerifier{}
 
 type falseVerifier struct{ io.Writer }
 
-func newFalseVerifier() Verifier    { return falseVerifier{ioutil.Discard} }
+func newFalseVerifier() Verifier    { return falseVerifier{io.Discard} }
 func (falseVerifier) Verify() error { return errors.New("test verifier") }
 
 func Test_detectMIMEType(t *testing.T) {
@@ -414,8 +417,8 @@ func Test_extractArchive(t *testing.T) {
 		defaultExtractors = oldextractors
 	}()
 	defaultExtractors = map[string]extractor{
-		"application/octet-stream": func(targetDir string, read io.ReaderAt, size int64) error { return nil },
-		"text/plain":               func(targetDir string, read io.ReaderAt, size int64) error { return errors.New("fail test") },
+		"application/octet-stream": func(_ string, _ io.ReaderAt, _ int64) error { return nil },
+		"text/plain":               func(_ string, _ io.ReaderAt, _ int64) error { return errors.New("fail test") },
 	}
 	type args struct {
 		filename string
@@ -585,10 +588,11 @@ func Test_extractMaliciousArchive(t *testing.T) {
 // tarGZArchiveForTesting creates an in-memory zip archive with entries from
 // the files map, where keys are the paths and values are the contents.
 // For example, to create an empty file `a` and another file `b/c`:
-//  tarGZArchiveForTesting(map[string]string{
-//     "a": "",
-//     "b/c": "nested content",
-//  })
+//
+//	tarGZArchiveForTesting(map[string]string{
+//	   "a": "",
+//	   "b/c": "nested content",
+//	})
 func tarGZArchiveForTesting(files map[string]string) (*bytes.Reader, error) {
 	archiveBuffer := &bytes.Buffer{}
 	gzArchiveBuffer := gzip.NewWriter(archiveBuffer)
@@ -597,7 +601,7 @@ func tarGZArchiveForTesting(files map[string]string) (*bytes.Reader, error) {
 		header := &tar.Header{
 			Name: path,
 			Size: int64(len(content)),
-			Mode: 0600,
+			Mode: 0o600,
 		}
 		if err := tw.WriteHeader(header); err != nil {
 			return nil, err
@@ -621,7 +625,8 @@ func tarGZArchiveForTesting(files map[string]string) (*bytes.Reader, error) {
 // entries with empty content just create a directory. The zip spec requires that
 // parent directories are explicitly listed in the archive, so this must be done
 // for nested entries. For example, to create a file at `a/b/c`, you must pass:
-//  map[string]string{"a": "", "a/b": "", "a/b/c": "nested content"}
+//
+//	map[string]string{"a": "", "a/b": "", "a/b/c": "nested content"}
 func zipArchiveReaderForTesting(files map[string]string) (*bytes.Reader, error) {
 	archiveBuffer := &bytes.Buffer{}
 	zw := zip.NewWriter(archiveBuffer)

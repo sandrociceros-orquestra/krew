@@ -67,6 +67,9 @@ You can invoke krew through kubectl: "kubectl krew [command]..."`,
 	SilenceErrors:     true,
 	PersistentPreRunE: preRun,
 	PersistentPostRun: showUpgradeNotification,
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -108,7 +111,7 @@ func init() {
 		"{{.CommandPath}}", "kubectl {{.CommandPath}}").Replace(rootCmd.UsageTemplate()))
 }
 
-func preRun(cmd *cobra.Command, _ []string) error {
+func preRun(_ *cobra.Command, _ []string) error {
 	// check must be done before ensureDirs, to detect krew's self-installation
 	if !internal.IsBinDirInPATH(paths) {
 		internal.PrintWarning(os.Stderr, internal.SetupInstructions()+"\n\n")
@@ -209,10 +212,23 @@ func cleanupStaleKrewInstallations() error {
 }
 
 func checkIndex(_ *cobra.Command, _ []string) error {
-	if ok, err := gitutil.IsGitCloned(paths.IndexPath(constants.DefaultIndexName)); err != nil {
-		return errors.Wrap(err, "failed to check local index git repository")
-	} else if !ok {
+	entries, err := os.ReadDir(paths.IndexBase())
+	if err != nil {
+		return errors.Wrap(err, "failed to list directory")
+	}
+	if len(entries) == 0 {
 		return errors.New(`krew local plugin index is not initialized (run "kubectl krew update")`)
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		indexPath := paths.IndexPath(e.Name())
+		if ok, err := gitutil.IsGitCloned(indexPath); err != nil {
+			return errors.Wrap(err, "failed to check local index git repository")
+		} else if !ok {
+			return errors.Errorf("invalid index %q, non git directory found in index folder", e.Name())
+		}
 	}
 	return nil
 }
@@ -220,7 +236,7 @@ func checkIndex(_ *cobra.Command, _ []string) error {
 func ensureDirs(paths ...string) error {
 	for _, p := range paths {
 		klog.V(4).Infof("Ensure creating dir: %q", p)
-		if err := os.MkdirAll(p, 0755); err != nil {
+		if err := os.MkdirAll(p, 0o755); err != nil {
 			return errors.Wrapf(err, "failed to ensure create directory %q", p)
 		}
 	}

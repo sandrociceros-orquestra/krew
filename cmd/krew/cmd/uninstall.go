@@ -37,7 +37,7 @@ Example:
 
 Remarks:
   Failure to uninstall a plugin will result in an error and exit immediately.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		for _, name := range args {
 			if isCanonicalName(name) {
 				return errors.New("uninstall command does not support INDEX/PLUGIN syntax; just specify PLUGIN")
@@ -54,7 +54,7 @@ Remarks:
 	},
 	PreRunE: checkIndex,
 	Args:    cobra.MinimumNArgs(1),
-	Aliases: []string{"remove"},
+	Aliases: []string{"remove", "rm"},
 }
 
 func unsafePluginNameErr(n string) error { return errors.Errorf("plugin name %q not allowed", n) }

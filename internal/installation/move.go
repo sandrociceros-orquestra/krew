@@ -16,7 +16,6 @@ package installation
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -130,7 +129,7 @@ func moveFiles(fromDir, toDir string, fo index.FileOperation) error {
 
 	for _, m := range moves {
 		klog.V(2).Infof("Move file from %q to %q", m.from, m.to)
-		if err := os.MkdirAll(filepath.Dir(m.to), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(m.to), 0o755); err != nil {
 			return errors.Wrapf(err, "failed to create move path %q", filepath.Dir(m.to))
 		}
 
@@ -155,14 +154,19 @@ func moveAllFiles(fromDir, toDir string, fos []index.FileOperation) error {
 func moveToInstallDir(srcDir, installDir string, fos []index.FileOperation) error {
 	installationDir := filepath.Dir(installDir)
 	klog.V(4).Infof("Creating directory %q", installationDir)
-	if err := os.MkdirAll(installationDir, 0755); err != nil {
+	if err := os.MkdirAll(installationDir, 0o755); err != nil {
 		return errors.Wrapf(err, "error creating directory at %q", installationDir)
 	}
 
-	tmp, err := ioutil.TempDir("", "krew-temp-move")
+	tmp, err := os.MkdirTemp("", "krew-temp-move")
 	klog.V(4).Infof("Creating temp plugin move operations dir %q", tmp)
 	if err != nil {
-		return errors.Wrap(err, "failed to find a temporary director")
+		return errors.Wrap(err, "failed to find a temporary directory")
+	}
+	klog.V(4).Infof("Chmoding tmpdir %q to 0755", tmp)
+	if err := os.Chmod(tmp, 0o755); err != nil {
+		// mktemp gives a 0700 directory but since we move this to KREW_ROOT, we need to make it 0755
+		return errors.Wrap(err, "failed to chmod temp directory")
 	}
 	defer os.RemoveAll(tmp)
 
